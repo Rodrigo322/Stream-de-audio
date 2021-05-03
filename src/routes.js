@@ -6,11 +6,11 @@ const router = Router()
 
 // 10 * 1024 * 1024 // 10MB
 // usamos um buffer minúsculo! O padrão é 64k
-const highWaterMark =  2;
+const highWaterMark = 2;
 
 router.get('/audio', async (req, res) => {
-    const filePath = './src/audio.ogg';
-    
+    const filePath = './src/mp3.mp3';
+
     // usou a instrução await
     const stat = await getStat(filePath);
 
@@ -18,7 +18,7 @@ router.get('/audio', async (req, res) => {
     console.log(stat);
 
     res.writeHead(200, {
-        'Content-Type': 'audio/ogg',
+        'Content-Type': 'audio/mp3',
         'Content-Length': stat.size
     });
 
@@ -29,6 +29,48 @@ router.get('/audio', async (req, res) => {
 
     // faz streaming do audio 
     stream.pipe(res);
+});
+
+
+router.get('/video', function (req, res) {
+
+    const path = 'src/video.mp4'
+    const stat = fs.statSync(path)
+    const fileSize = stat.size
+    const range = req.headers.range
+
+    if (range) {
+        const parts = range.replace(/bytes=/, "").split("-")
+        const start = parseInt(parts[0], 10)
+        const end = parts[1]
+            ? parseInt(parts[1], 10)
+            : fileSize - 1
+
+        if (start >= fileSize) {
+            res.status(416).send('O tamanho do arquivo não e suficiente\n' + start + ' >= ' + fileSize);
+            return
+        }
+
+        const chunksize = (end - start) + 1
+        const file = fs.createReadStream(path, { start, end })
+        const head = {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize,
+            'Content-Type': 'video/mp4',
+        }
+
+        res.writeHead(206, head)
+        file.pipe(res)
+
+    } else {
+        const head = {
+            'Content-Length': fileSize,
+            'Content-Type': 'video/mp4',
+        }
+        res.writeHead(200, head)
+        fs.createReadStream(path).pipe(res)
+    }
 });
 
 module.exports = router
